@@ -8,7 +8,7 @@ from app.schemas import BlockingReasonCreate, BlockingReasonUpdate, BlockingReas
 from app.services.moderation_queue_service import ModerationQueueService
 
 router = APIRouter(
-    prefix="/api/v1/blocking-reasons",
+    prefix="/api/v1/product-blocking-reasons",
     tags=["blocking-reasons"],
 )
 

@@ -7,6 +7,10 @@ from app.api.routers.tickets import router as tickets_router
 from app.api.routers.blocking_reasons import router as blocking_reasons_router
 from app.api.routers.b2b_events import router as b2b_events_router
 from app.api.routers.stats import router as stats_router
+from app.api.routers.product_moderation import (
+    product_moderation_router,
+    products_moderation_router,
+)
 
 main_router = APIRouter()
 
@@ -17,5 +21,8 @@ main_router.include_router(tickets_router)
 main_router.include_router(blocking_reasons_router)
 main_router.include_router(b2b_events_router)
 main_router.include_router(stats_router)
+# Canonical paths (moderation-flows.md)
+main_router.include_router(product_moderation_router)
+main_router.include_router(products_moderation_router)
 
 __all__ = ["main_router"]

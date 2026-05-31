@@ -215,6 +215,17 @@ class IncomingB2BEvent(BaseModel):
     payload: dict  # parsed inside handler
 
 
+class ProductEventFromB2B(BaseModel):
+    """Canonical event format from B2B (moderation-flows.md MOD-1).
+
+    POST /api/v1/events/product
+    """
+    product_id: UUID
+    seller_id: UUID
+    event: Literal["CREATED", "EDITED", "DELETED"]
+    date: datetime
+
+
 # ---------------------------------------------------------------------------
 # Stats schemas
 # ---------------------------------------------------------------------------

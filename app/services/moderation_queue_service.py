@@ -266,6 +266,28 @@ class ModerationQueueService:
 
         return ticket
 
+    @classmethod
+    async def get_by_product_id(
+        cls,
+        session: AsyncSession,
+        product_id: UUID,
+    ) -> TicketModel:
+        """Fetch the active (non-cancelled) ticket for a product. Used by canonical product endpoints."""
+        stmt = (
+            select(TicketModel)
+            .where(
+                TicketModel.product_id == product_id,
+                TicketModel.status.not_in(["CANCELLED", "CLOSED"]),
+            )
+            .order_by(TicketModel.created_at.desc())
+            .limit(1)
+            .options(selectinload(TicketModel.history))
+        )
+        ticket = await session.scalar(stmt)
+        if ticket is None:
+            raise HTTPException(status_code=404, detail="Product not found in moderation queue")
+        return ticket
+
     # ------------------------------------------------------------------
     # Ticket actions
     # ------------------------------------------------------------------
