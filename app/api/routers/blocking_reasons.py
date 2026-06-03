@@ -12,8 +12,15 @@ router = APIRouter(
     tags=["blocking-reasons"],
 )
 
+# OpenAPI-compliant alias (moderation/openapi.yaml uses /blocking-reasons)
+router_alias = APIRouter(
+    prefix="/api/v1/blocking-reasons",
+    tags=["blocking-reasons"],
+)
+
 
 @router.get("", response_model=list[BlockingReasonResponse])
+@router_alias.get("", response_model=list[BlockingReasonResponse])
 async def list_blocking_reasons(
     moderator: ModeratorDep,
     session: SessionDep,
@@ -24,6 +31,7 @@ async def list_blocking_reasons(
 
 
 @router.post("", response_model=BlockingReasonResponse, status_code=status.HTTP_201_CREATED)
+@router_alias.post("", response_model=BlockingReasonResponse, status_code=status.HTTP_201_CREATED)
 async def create_blocking_reason(
     body: BlockingReasonCreate,
     admin: AdminModeratorDep,
@@ -33,6 +41,7 @@ async def create_blocking_reason(
 
 
 @router.patch("/{reason_id}", response_model=BlockingReasonResponse)
+@router_alias.patch("/{reason_id}", response_model=BlockingReasonResponse)
 async def update_blocking_reason(
     reason_id: UUID,
     body: BlockingReasonUpdate,
@@ -43,6 +52,7 @@ async def update_blocking_reason(
 
 
 @router.delete("/{reason_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router_alias.delete("/{reason_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_blocking_reason(
     reason_id: UUID,
     admin: AdminModeratorDep,
