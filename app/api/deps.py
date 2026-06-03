@@ -81,9 +81,9 @@ async def get_current_active_auth_admin_moderator(
 
 
 async def verify_service_key(
-    x_service_key: Annotated[str, Header(alias="X-Service-Key")],
+    x_service_key: Annotated[str | None, Header(alias="X-Service-Key")] = None,
 ) -> None:
-    if x_service_key != settings.SERVICE_KEY:
+    if not x_service_key or x_service_key != settings.SERVICE_KEY:
         raise UNAUTHORIZED
 
 

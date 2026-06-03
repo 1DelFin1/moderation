@@ -19,3 +19,20 @@ dependencies = [
     "sqlalchemy>=2.0.43",
     "uvicorn>=0.35.0",
 ]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "anyio[asyncio]>=4.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[dependency-groups]
+dev = [
+    "anyio>=4.13.0",
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.4.0",
+]
