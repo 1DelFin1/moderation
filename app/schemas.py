@@ -183,6 +183,26 @@ class BlockDecisionRequest(BaseModel):
     field_reports: list[FieldReportSchema] = []
 
 
+# Canon field_name enum (moderation-flows.md#soft-block)
+FieldName = Literal[
+    "title", "description", "product_images",
+    "category", "sku_name", "sku_image", "sku_price",
+]
+
+
+class CanonFieldReport(BaseModel):
+    field_name: FieldName
+    sku_id: UUID | None = None
+    comment: str = Field(max_length=500)
+
+
+class DeclineRequest(BaseModel):
+    """Canon request body for POST /api/v1/products/{product_id}/decline (MOD-4)."""
+    blocking_reason_id: UUID
+    moderator_comment: str = Field(max_length=1000)
+    field_reports: list[CanonFieldReport] = []
+
+
 # ---------------------------------------------------------------------------
 # B2B event schemas
 # ---------------------------------------------------------------------------

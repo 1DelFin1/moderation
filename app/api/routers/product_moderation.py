@@ -16,6 +16,8 @@ from app.schemas import (
     ApproveRequest,
     BlockDecisionRequest,
     ClaimNextRequest,
+    DeclineRequest,
+    FieldReportSchema,
     TicketResponse,
 )
 from app.services.moderation_queue_service import ModerationQueueService
@@ -89,24 +91,32 @@ async def approve_product(
 @products_moderation_router.post("/{product_id}/decline", response_model=TicketResponse)
 async def decline_product(
     product_id: UUID,
-    body: BlockDecisionRequest,
+    body: DeclineRequest,
     moderator: ModeratorDep,
     session: SessionDep,
 ):
     """MOD-4/5: Soft-block (BLOCKED) or hard-block (HARD_BLOCKED) a product by product_id.
 
-    If any selected blocking_reason has hard_block=true → status becomes HARD_BLOCKED.
-    Sends BLOCKED event to B2B.
+    If the blocking_reason has hard_block=true → status becomes HARD_BLOCKED (MOD-5).
+    Sends BLOCKED event to B2B with hard_block flag.
     """
     ticket = await ModerationQueueService.get_by_product_id(session, product_id)
     is_admin = moderator.role == "ADMIN"
+    # Convert canon CanonFieldReport → FieldReportSchema for the service layer
+    field_reports = [
+        FieldReportSchema(
+            field_path=fr.field_name,
+            message=fr.comment,
+        )
+        for fr in body.field_reports
+    ]
     ticket = await ModerationQueueService.block(
         session,
         ticket_id=ticket.id,
         moderator_id=moderator.id,
-        blocking_reason_ids=body.blocking_reason_ids,
-        comment=body.comment,
-        field_reports=body.field_reports,
+        blocking_reason_ids=[body.blocking_reason_id],
+        comment=body.moderator_comment,
+        field_reports=field_reports,
         is_admin=is_admin,
     )
     return TicketResponse.model_validate(ticket)

@@ -416,7 +416,10 @@ class ModerationQueueService:
             raise HTTPException(status_code=409, detail="Ticket is not IN_REVIEW")
 
         if not is_admin and ticket.assigned_moderator_id != moderator_id:
-            raise HTTPException(status_code=409, detail="Not assigned to you")
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "FORBIDDEN", "message": "This moderation card is not assigned to you"},
+            )
 
         # Load blocking reasons
         stmt = select(ProductBlockingReasonModel).where(
