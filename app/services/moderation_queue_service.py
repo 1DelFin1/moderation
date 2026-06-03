@@ -150,6 +150,19 @@ class ModerationQueueService:
         queue_priority: int | None = None,
         category_ids: list[UUID] | None = None,
     ) -> TicketModel | None:
+        # Reject if moderator already has an active IN_REVIEW ticket
+        existing = await session.scalar(
+            select(TicketModel).where(
+                TicketModel.assigned_moderator_id == moderator_id,
+                TicketModel.status == "IN_REVIEW",
+            )
+        )
+        if existing is not None:
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "ALREADY_IN_REVIEW", "message": "You already have a ticket in review"},
+            )
+
         stmt = (
             select(TicketModel)
             .where(TicketModel.status == "PENDING")
