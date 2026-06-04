@@ -357,16 +357,33 @@ class ModerationQueueService:
     ) -> TicketModel:
         ticket = await cls.get_by_id(session, ticket_id)
 
+        if ticket.status == "HARD_BLOCKED":
+            raise HTTPException(status_code=409, detail="Product is permanently blocked")
+
         if ticket.status != "IN_REVIEW":
-            raise HTTPException(status_code=409, detail="Ticket is not IN_REVIEW")
+            raise HTTPException(status_code=409, detail="Product is not in review status")
 
         if not is_admin and ticket.assigned_moderator_id != moderator_id:
-            raise HTTPException(status_code=409, detail="Not assigned to you")
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "FORBIDDEN", "message": "This moderation card is not assigned to you"},
+            )
+
+        # Prevent approving a product with no SKUs (canon MOD-3, edge case 5)
+        json_after = ticket.json_after or {}
+        skus = json_after.get("skus") or []
+        if not skus:
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "CONFLICT", "message": "Product has no SKUs, cannot approve"},
+            )
 
         now = _now()
-        ticket.status = "APPROVED"
+        ticket.status = "MODERATED"
         ticket.decision_at = now
         ticket.decision_comment = comment
+        ticket.blocking_reason_ids = None
+        ticket.field_reports = []
         ticket.updated_at = now
 
         history_entry = TicketHistoryModel(
