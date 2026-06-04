@@ -315,6 +315,12 @@ class ModerationQueueService:
     ) -> TicketModel:
         ticket = await cls.get_by_id(session, ticket_id)
 
+        if ticket.status == "HARD_BLOCKED":
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "FORBIDDEN", "message": "Product is permanently blocked, no modifications allowed"},
+            )
+
         if ticket.status != "IN_REVIEW":
             raise HTTPException(status_code=409, detail="Ticket is not IN_REVIEW")
 
@@ -358,7 +364,10 @@ class ModerationQueueService:
         ticket = await cls.get_by_id(session, ticket_id)
 
         if ticket.status == "HARD_BLOCKED":
-            raise HTTPException(status_code=409, detail="Product is permanently blocked")
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "FORBIDDEN", "message": "Product is permanently blocked, no modifications allowed"},
+            )
 
         if ticket.status != "IN_REVIEW":
             raise HTTPException(status_code=409, detail="Product is not in review status")
@@ -428,6 +437,12 @@ class ModerationQueueService:
         is_admin: bool = False,
     ) -> TicketModel:
         ticket = await cls.get_by_id(session, ticket_id)
+
+        if ticket.status == "HARD_BLOCKED":
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "FORBIDDEN", "message": "Product is permanently blocked, no modifications allowed"},
+            )
 
         if ticket.status != "IN_REVIEW":
             raise HTTPException(status_code=409, detail="Ticket is not IN_REVIEW")
@@ -554,6 +569,17 @@ class ModerationQueueService:
             json_before = payload.get("json_before", {})
             json_after = payload.get("json_after", {})
 
+            # Canon MOD-1: EDITED event is silently ignored for HARD_BLOCKED products
+            hard_blocked = await session.scalar(
+                select(TicketModel).where(
+                    TicketModel.product_id == product_id,
+                    TicketModel.status == "HARD_BLOCKED",
+                )
+            )
+            if hard_blocked is not None:
+                logger.info("EDITED event ignored for HARD_BLOCKED product %s", product_id)
+                return False
+
             ticket = TicketModel(
                 id=uuid4(),
                 product_id=product_id,
@@ -580,11 +606,11 @@ class ModerationQueueService:
 
         elif event_type == "PRODUCT_DELETED":
             product_id = UUID(str(payload["product_id"]))
-            # Cancel all open tickets for this product
-            open_statuses = ["PENDING", "IN_REVIEW"]
+            # Cancel all open tickets including HARD_BLOCKED (canon: DELETED removes record)
+            cancellable_statuses = ["PENDING", "IN_REVIEW", "HARD_BLOCKED"]
             stmt = select(TicketModel).where(
                 TicketModel.product_id == product_id,
-                TicketModel.status.in_(open_statuses),
+                TicketModel.status.in_(cancellable_statuses),
             )
             result = await session.scalars(stmt)
             tickets = list(result.all())
