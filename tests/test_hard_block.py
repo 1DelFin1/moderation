@@ -165,8 +165,10 @@ async def test_hard_block_event_carries_hard_block_true():
 
     mock_send.assert_awaited_once()
     send_kwargs = mock_send.call_args.kwargs
-    assert send_kwargs["event_type"] == "BLOCKED"
+    assert send_kwargs["status"] == "BLOCKED"
     assert send_kwargs["hard_block"] is True
+    assert send_kwargs["blocking_reason"]["id"] == str(_REASON_ID)
+    assert send_kwargs["blocking_reason"]["title"] == "Контрафактный товар"
 
     # Ticket status set to HARD_BLOCKED before commit
     assert ticket.status == "HARD_BLOCKED"

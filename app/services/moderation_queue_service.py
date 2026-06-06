@@ -407,13 +407,10 @@ class ModerationQueueService:
         session.add(history_entry)
         await session.commit()
 
-        # Send event to B2B
         from app.services.event_service import send_result_to_b2b
         await send_result_to_b2b(
             product_id=ticket.product_id,
-            event_type="MODERATED",
-            moderator_id=moderator_id,
-            moderator_comment=comment,
+            status="MODERATED",
             hard_block=False,
             occurred_at=now,
         )
@@ -487,14 +484,27 @@ class ModerationQueueService:
         session.add(history_entry)
         await session.commit()
 
+        blocking_reason_obj = {
+            "id": str(reasons[0].id),
+            "title": reasons[0].title,
+            "comment": comment or "",
+        }
+        field_reports_for_event = [
+            {
+                "field_name": fr.field_path,
+                "sku_id": str(fr.sku_id) if fr.sku_id else None,
+                "comment": fr.message,
+            }
+            for fr in (field_reports or [])
+        ]
+
         from app.services.event_service import send_result_to_b2b
         await send_result_to_b2b(
             product_id=ticket.product_id,
-            event_type="BLOCKED",
-            moderator_id=moderator_id,
-            moderator_comment=comment,
-            blocking_reason_ids=[r.id for r in reasons],
+            status="BLOCKED",
             hard_block=any_hard_block,
+            blocking_reason=blocking_reason_obj,
+            field_reports=field_reports_for_event,
             occurred_at=now,
         )
 

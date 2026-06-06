@@ -9,11 +9,10 @@ logger = logging.getLogger(__name__)
 
 async def send_result_to_b2b(
     product_id: UUID,
-    event_type: str,  # "MODERATED" | "BLOCKED"
-    moderator_id: UUID,
-    moderator_comment: str | None,
+    status: str,  # "MODERATED" | "BLOCKED"
     hard_block: bool,
-    blocking_reason_ids: list[UUID] | None = None,
+    blocking_reason: dict | None = None,  # {id, title, comment}
+    field_reports: list[dict] | None = None,  # [{field_name, sku_id, comment}]
     occurred_at: datetime | None = None,
 ) -> None:
     from app.core.config import settings
@@ -21,18 +20,18 @@ async def send_result_to_b2b(
     if occurred_at is None:
         occurred_at = datetime.now(timezone.utc)
 
-    payload = {
+    payload: dict = {
         "idempotency_key": str(uuid4()),
         "product_id": str(product_id),
-        "event_type": event_type,
-        "moderator_id": str(moderator_id),
-        "moderator_comment": moderator_comment,
-        "blocking_reason_id": str(blocking_reason_ids[0]) if blocking_reason_ids else None,
-        "hard_block": hard_block,
-        "occurred_at": occurred_at.isoformat(),
+        "status": status,
     }
 
-    url = settings.B2B_URL + "/api/v1/moderation/events"
+    if status == "BLOCKED":
+        payload["hard_block"] = hard_block
+        payload["blocking_reason"] = blocking_reason or {}
+        payload["field_reports"] = field_reports or []
+
+    url = settings.B2B_URL + "/api/v1/events/moderation"
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:

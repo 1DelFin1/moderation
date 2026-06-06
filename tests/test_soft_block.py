@@ -133,6 +133,7 @@ async def test_soft_block_emits_event_via_service_directly():
 
     soft_reason = MagicMock(spec=ProductBlockingReasonModel)
     soft_reason.id = _REASON_ID
+    soft_reason.title = "Описание не соответствует товару"
     soft_reason.hard_block = False
 
     ticket = _make_blocked_ticket(status="IN_REVIEW")
@@ -162,8 +163,15 @@ async def test_soft_block_emits_event_via_service_directly():
 
     mock_send.assert_awaited_once()
     send_kwargs = mock_send.call_args.kwargs
-    assert send_kwargs["event_type"] == "BLOCKED"
+    assert send_kwargs["status"] == "BLOCKED"
     assert send_kwargs["hard_block"] is False
+
+    blocking_reason = send_kwargs["blocking_reason"]
+    assert blocking_reason["id"] == str(_REASON_ID)
+    assert blocking_reason["title"] == "Описание не соответствует товару"
+    assert blocking_reason["comment"] == "Test comment"
+
+    assert send_kwargs["field_reports"] == []
 
 
 # ── Unhappy paths ─────────────────────────────────────────────────────────────

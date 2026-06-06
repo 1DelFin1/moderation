@@ -102,11 +102,11 @@ async def decline_product(
     """
     ticket = await ModerationQueueService.get_by_product_id(session, product_id)
     is_admin = moderator.role == "ADMIN"
-    # Convert canon CanonFieldReport → FieldReportSchema for the service layer
     field_reports = [
         FieldReportSchema(
             field_path=fr.field_name,
             message=fr.comment,
+            sku_id=fr.sku_id,
         )
         for fr in body.field_reports
     ]

@@ -122,6 +122,7 @@ class FieldReportSchema(BaseModel):
     field_path: str
     message: str
     severity: Literal["INFO", "WARNING", "ERROR"] = "ERROR"
+    sku_id: UUID | None = None
 
 
 class TicketHistoryEntrySchema(BaseModel):

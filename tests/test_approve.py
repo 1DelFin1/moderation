@@ -150,7 +150,7 @@ async def test_approve_emits_moderated_event_via_service():
 
     mock_send.assert_awaited_once()
     send_kwargs = mock_send.call_args.kwargs
-    assert send_kwargs["event_type"] == "MODERATED"
+    assert send_kwargs["status"] == "MODERATED"
     assert send_kwargs["hard_block"] is False
     assert send_kwargs["product_id"] == _PRODUCT_ID
 
