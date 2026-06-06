@@ -29,6 +29,20 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _compute_edited_priority(old_status: str, old_priority: int, json_after: dict) -> int:
+    """Compute queue_priority for an EDITED event per canon MOD-1."""
+    if old_status == "BLOCKED":
+        return 2
+    if old_status == "MODERATED":
+        total_active = sum(
+            int(sku.get("active_quantity", 0))
+            for sku in (json_after.get("skus") or [])
+        )
+        return 3 if total_active > 0 else 4
+    # PENDING or IN_REVIEW (seller re-edited while in queue) — keep current priority
+    return old_priority
+
+
 class ModerationQueueService:
 
     # ------------------------------------------------------------------
@@ -542,9 +556,26 @@ class ModerationQueueService:
 
         if event_type == "PRODUCT_CREATED":
             product_id = UUID(str(payload["product_id"]))
+
+            # Check for any active (non-terminal) ticket for this product
+            active_ticket = await session.scalar(
+                select(TicketModel).where(
+                    TicketModel.product_id == product_id,
+                    TicketModel.status.not_in(["CANCELLED", "CLOSED"]),
+                )
+            )
+            if active_ticket is not None:
+                if active_ticket.status == "HARD_BLOCKED":
+                    logger.info("CREATED event ignored for HARD_BLOCKED product %s", product_id)
+                else:
+                    logger.warning(
+                        "Duplicate CREATED for product %s (status=%s), ignoring",
+                        product_id, active_ticket.status,
+                    )
+                return False
+
             seller_id = UUID(str(payload["seller_id"]))
             category_id = UUID(str(payload["category_id"])) if payload.get("category_id") else None
-            queue_priority = int(payload.get("queue_priority", 3))
             json_after = payload.get("json_after", {})
 
             ticket = TicketModel(
@@ -554,7 +585,7 @@ class ModerationQueueService:
                 category_id=category_id,
                 kind="CREATE",
                 status="PENDING",
-                queue_priority=queue_priority,
+                queue_priority=1,
                 json_before=None,
                 json_after=json_after,
                 idempotency_key=idempotency_key,
@@ -573,44 +604,50 @@ class ModerationQueueService:
 
         elif event_type == "PRODUCT_EDITED":
             product_id = UUID(str(payload["product_id"]))
-            seller_id = UUID(str(payload["seller_id"]))
-            category_id = UUID(str(payload["category_id"])) if payload.get("category_id") else None
-            queue_priority = int(payload.get("queue_priority", 3))
-            json_before = payload.get("json_before", {})
             json_after = payload.get("json_after", {})
 
-            # Canon MOD-1: EDITED event is silently ignored for HARD_BLOCKED products
-            hard_blocked = await session.scalar(
+            # Find existing active ticket for this product
+            active_ticket = await session.scalar(
                 select(TicketModel).where(
                     TicketModel.product_id == product_id,
-                    TicketModel.status == "HARD_BLOCKED",
+                    TicketModel.status.not_in(["CANCELLED", "CLOSED"]),
                 )
             )
-            if hard_blocked is not None:
+
+            if active_ticket is None:
+                logger.warning("EDITED event for unknown product %s, no active ticket found", product_id)
+                return False
+
+            # Canon MOD-1: EDITED event is silently ignored for HARD_BLOCKED products
+            if active_ticket.status == "HARD_BLOCKED":
                 logger.info("EDITED event ignored for HARD_BLOCKED product %s", product_id)
                 return False
 
-            ticket = TicketModel(
-                id=uuid4(),
-                product_id=product_id,
-                seller_id=seller_id,
-                category_id=category_id,
-                kind="EDIT",
-                status="PENDING",
-                queue_priority=queue_priority,
-                json_before=json_before,
-                json_after=json_after,
-                idempotency_key=idempotency_key,
-                created_at=now,
-                updated_at=now,
+            # Update ticket in-place (canon: no new row, same product_id UNIQUE constraint)
+            new_priority = _compute_edited_priority(
+                active_ticket.status, active_ticket.queue_priority, json_after
             )
+
+            active_ticket.json_before = active_ticket.json_after
+            active_ticket.json_after = json_after
+            active_ticket.kind = "EDIT"
+            active_ticket.status = "PENDING"
+            active_ticket.queue_priority = new_priority
+            active_ticket.assigned_moderator_id = None
+            active_ticket.claimed_at = None
+            active_ticket.claim_expires_at = None
+            active_ticket.field_reports = []
+            active_ticket.blocking_reason_ids = None
+            active_ticket.idempotency_key = idempotency_key
+            active_ticket.updated_at = now
+
             history_entry = TicketHistoryModel(
                 id=uuid4(),
-                ticket_id=ticket.id,
+                ticket_id=active_ticket.id,
                 at=now,
-                action="CREATED",
+                action="EDITED",
             )
-            session.add(ticket)
+            session.add(active_ticket)
             session.add(history_entry)
             await session.commit()
 
