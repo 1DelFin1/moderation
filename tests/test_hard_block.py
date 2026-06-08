@@ -288,24 +288,26 @@ async def test_edited_event_on_hard_blocked_is_ignored(ac):
     No new ticket is created; the product remains in its terminal state.
     """
     with patch(
-        "app.api.routers.b2b_events._fetch_product_from_b2b",
-        AsyncMock(return_value={"skus": [_SKU], "title": "Test"}),
-    ), patch(
         "app.api.routers.b2b_events.ModerationQueueService.handle_b2b_event",
         AsyncMock(return_value=False),  # not duplicate, but skipped due to HARD_BLOCKED
     ):
         resp = await ac.post(
-            "/api/v1/events/product",
+            "/api/v1/b2b/events",
             json={
-                "product_id": str(_PRODUCT_ID),
-                "seller_id": str(uuid4()),
-                "event": "EDITED",
-                "date": _NOW.isoformat(),
+                "event_type": "PRODUCT_EDITED",
+                "idempotency_key": str(uuid4()),
+                "occurred_at": _NOW.isoformat(),
+                "payload": {
+                    "product_id": str(_PRODUCT_ID),
+                    "seller_id": str(uuid4()),
+                    "json_before": {},
+                    "json_after": {"skus": [_SKU], "title": "Test"},
+                },
             },
             headers={"X-Service-Key": _SERVICE_KEY},
         )
 
-    assert resp.status_code == 200
+    assert resp.status_code == 202
 
 
 @pytest.mark.asyncio

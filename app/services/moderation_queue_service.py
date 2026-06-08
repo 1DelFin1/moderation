@@ -653,8 +653,8 @@ class ModerationQueueService:
 
         elif event_type == "PRODUCT_DELETED":
             product_id = UUID(str(payload["product_id"]))
-            # Cancel all open tickets including HARD_BLOCKED (canon: DELETED removes record)
-            cancellable_statuses = ["PENDING", "IN_REVIEW", "HARD_BLOCKED"]
+            # Cancel all open tickets regardless of status (canon: DELETED removes record)
+            cancellable_statuses = ["PENDING", "IN_REVIEW", "MODERATED", "BLOCKED", "HARD_BLOCKED"]
             stmt = select(TicketModel).where(
                 TicketModel.product_id == product_id,
                 TicketModel.status.in_(cancellable_statuses),
