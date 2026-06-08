@@ -23,15 +23,16 @@ async def send_result_to_b2b(
     payload: dict = {
         "idempotency_key": str(uuid4()),
         "product_id": str(product_id),
-        "status": status,
+        "event_type": status,
+        "occurred_at": occurred_at.isoformat(),
     }
 
     if status == "BLOCKED":
         payload["hard_block"] = hard_block
-        payload["blocking_reason"] = blocking_reason or {}
+        payload["blocking_reason_id"] = (blocking_reason or {}).get("id")
         payload["field_reports"] = field_reports or []
 
-    url = settings.B2B_URL + "/api/v1/events/moderation"
+    url = settings.B2B_URL + "/api/v1/moderation/events"
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
